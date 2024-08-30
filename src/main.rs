@@ -1,0 +1,216 @@
+mod datasource {
+    pub mod app_description;
+    pub mod cloudwatch_log_insight;
+    pub mod cloudwatch_metric;
+    pub mod ec2;
+    pub mod rds;
+    pub mod ds;
+}
+mod lib {
+    pub mod config;
+    pub mod prompt;
+    pub mod openai;
+}
+
+use crate::datasource::ds::DataSource;
+use crate::datasource::ds::DataSource::{AppDescription, CloudwatchLogInsight, CloudwatchMetric, Ec2, Rds};
+use crate::datasource::ec2;
+use crate::lib::config::Config;
+use crate::lib::openai::OpenAiChatInput;
+use crate::lib::{openai, prompt};
+use chrono::{NaiveDateTime, TimeZone};
+use chrono_tz::Tz;
+use clap::Parser;
+use std::error::Error;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::fs;
+
+const BANNER : &str = "
+███╗     █████╗ ██╗   ██╗████████╗ ██████╗
+██╔╝    ██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗
+██║     ███████║██║   ██║   ██║   ██║   ██║
+██║     ██╔══██║██║   ██║   ██║   ██║   ██║
+███╗    ██║  ██║╚██████╔╝   ██║   ╚██████╔╝
+╚══╝    ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝
+
+██████╗ ██╗ █████╗  ██████╗ ███╗   ██╗ ██████╗ ███████╗████████╗██╗ ██████╗    ███╗
+██╔══██╗██║██╔══██╗██╔════╝ ████╗  ██║██╔═══██╗██╔════╝╚══██╔══╝██║██╔════╝    ╚██║
+██║  ██║██║███████║██║  ███╗██╔██╗ ██║██║   ██║███████╗   ██║   ██║██║          ██║
+██║  ██║██║██╔══██║██║   ██║██║╚██╗██║██║   ██║╚════██║   ██║   ██║██║          ██║
+██████╔╝██║██║  ██║╚██████╔╝██║ ╚████║╚██████╔╝███████║   ██║   ██║╚██████╗    ███║
+╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═╝ ╚═════╝    ╚══╝
+================= version: {version} | written by: Jed Cua ================
+";
+
+// Automatically performs diagnosis on your AWS environment
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Configuration file to use
+    file: String,
+
+    /// Duration in seconds, since the current date time
+    #[arg(long, default_value_t = 3600)]
+    duration: u64,
+
+    /// Start time
+    #[arg(long)]
+    start: Option<String>,
+
+    /// End time
+    #[arg(long)]
+    end: Option<String>,
+
+    /// Print the raw prompt data
+    #[arg(long, default_value_t = false)]
+    print_prompt_data: bool,
+
+    /// Dry run mode, don't generate diagnosis
+    #[arg(long, default_value_t = false)]
+    dry_run: bool
+}
+
+struct AppContext {
+    profile: String,
+    start_time: i64,
+    end_time: i64,
+    time_zone: Tz,
+    data_sources: Vec<DataSource>,
+    open_ai_api_key: String,
+    open_ai_model: String,
+    open_ai_max_token: u32,
+    print_prompt_data: bool,
+    dry_run: bool
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let banner = BANNER.replace("{version}", env!("CARGO_PKG_VERSION"));
+    println!("{banner}");
+
+    let context = build_context().await?;
+    let prompt_data = prompt::build_prompt_data(&context).await?;
+
+    if context.print_prompt_data {
+        println!("\n{prompt_data}\n");
+    }
+
+    if !context.dry_run {
+        openai::send_request(&context, OpenAiChatInput {
+            model: context.open_ai_model.clone(),
+            max_tokens: context.open_ai_max_token,
+            system_prompt: prompt::INSTRUCTION.to_string(),
+            user_prompt: prompt_data
+        }).await?;
+    }
+
+    Ok(())
+}
+
+async fn build_context() -> Result<AppContext, Box<dyn Error>> {
+    let args = Args::parse();
+    let toml_content = fs::read_to_string(&args.file).await?;
+    let config: Config = toml::from_str(&toml_content)?;
+
+    let time_zone = match config.general.time_zone {
+        Some(tz) => tz.parse().expect("Unknown time zone"),
+        None => Tz::UTC
+    };
+
+    let (start_time, end_time) = build_start_and_end(&args, time_zone)?;
+
+    let mut data_sources: Vec<DataSource> = Vec::new();
+
+    if let Some(configs) = config.app_description {
+        for app_desc_config in configs {
+            data_sources.push(AppDescription {
+                order_no: app_desc_config.order_no,
+                config: app_desc_config
+            });
+        }
+    }
+
+    if let Some(configs) = config.ec2 {
+        for ec2_config in configs {
+            data_sources.push(Ec2 {
+                order_no: ec2_config.order_no,
+                config: ec2_config
+            });
+        }
+    }
+
+    if let Some(configs) = config.rds {
+        for rds_config in configs {
+            data_sources.push(Rds {
+                order_no: rds_config.order_no,
+                config: rds_config
+            });
+        }
+    }
+
+    if let Some(configs) = config.cloudwatch_metric {
+        for cloudwatch_config in configs {
+            data_sources.push(CloudwatchMetric {
+                order_no: cloudwatch_config.order_no,
+                config: cloudwatch_config
+            });
+        }
+    }
+
+    if let Some(configs) = config.cloudwatch_log_insight {
+        for cloudwatch_config in configs {
+            data_sources.push(CloudwatchLogInsight {
+                order_no: cloudwatch_config.order_no,
+                config: cloudwatch_config
+            });
+        }
+    }
+
+    data_sources.sort();
+
+    let context = AppContext {
+        profile: String::from(&config.general.profile),
+        start_time: start_time.as_millis() as i64,
+        end_time: end_time.as_millis() as i64,
+        time_zone,
+        data_sources,
+        open_ai_api_key: config.open_ai.api_key,
+        open_ai_model: config.open_ai.model,
+        open_ai_max_token: config.open_ai.max_token,
+        print_prompt_data: args.print_prompt_data,
+        dry_run: args.dry_run
+    };
+
+    Ok(context)
+}
+
+fn build_start_and_end(args: &Args, time_zone: Tz) -> Result<(Duration, Duration), Box<dyn Error>> {
+    let start_time: Duration;
+    let end_time: Duration;
+
+    match (&args.duration, &args.start, &args.end) {
+        // start & end are both present
+        (_, Some(s), Some(e)) => {
+            start_time = parse_date_time(s, &time_zone)?;
+            end_time = parse_date_time(e, &time_zone)?;
+        },
+        // start & end are both missing
+        (_, None, None) => {
+            end_time = SystemTime::now().duration_since(UNIX_EPOCH)?;
+            start_time = end_time.checked_sub(Duration::from_secs(args.duration)).unwrap();
+        }
+        _ => {
+            panic!("Both start and end arguments must be provided");
+        }
+    }
+
+    Ok((start_time, end_time))
+}
+
+fn parse_date_time(s: &str, time_zone: &Tz) -> Result<Duration, Box<dyn Error>> {
+    let format = "%Y-%m-%d %H:%M:%S";
+
+    Ok(NaiveDateTime::parse_from_str(s, format)
+        .map(|ndt| time_zone.from_local_datetime(&ndt).unwrap())
+        .map(|dt| Duration::from_millis(dt.timestamp_millis() as u64))?)
+}
