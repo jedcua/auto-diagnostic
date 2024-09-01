@@ -7,6 +7,7 @@ mod datasource {
     pub mod ds;
 }
 mod lib {
+    pub mod args;
     pub mod config;
     pub mod prompt;
     pub mod openai;
@@ -17,12 +18,10 @@ use crate::datasource::ds::DataSource::{AppDescription, CloudwatchLogInsight, Cl
 use crate::datasource::ec2;
 use crate::lib::config::Config;
 use crate::lib::openai::OpenAiChatInput;
-use crate::lib::{openai, prompt};
-use chrono::{NaiveDateTime, TimeZone};
+use crate::lib::{args, openai, prompt};
 use chrono_tz::Tz;
 use clap::Parser;
 use std::error::Error;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::fs;
 
 const BANNER : &str = "
@@ -42,34 +41,6 @@ const BANNER : &str = "
 ================= version: {version} | written by: Jed Cua ================
 ";
 
-// Automatically performs diagnosis on your AWS environment
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    /// Configuration file to use
-    file: String,
-
-    /// Duration in seconds, since the current date time
-    #[arg(long, default_value_t = 3600)]
-    duration: u64,
-
-    /// Start time
-    #[arg(long)]
-    start: Option<String>,
-
-    /// End time
-    #[arg(long)]
-    end: Option<String>,
-
-    /// Print the raw prompt data
-    #[arg(long, default_value_t = false)]
-    print_prompt_data: bool,
-
-    /// Dry run mode, don't generate diagnosis
-    #[arg(long, default_value_t = false)]
-    dry_run: bool
-}
-
 struct AppContext {
     profile: String,
     start_time: i64,
@@ -85,10 +56,11 @@ struct AppContext {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let context = build_context().await?;
+
     let banner = BANNER.replace("{version}", env!("CARGO_PKG_VERSION"));
     println!("{banner}");
 
-    let context = build_context().await?;
     let prompt_data = prompt::build_prompt_data(&context).await?;
 
     if context.print_prompt_data {
@@ -108,7 +80,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn build_context() -> Result<AppContext, Box<dyn Error>> {
-    let args = Args::parse();
+    let args = args::Args::parse();
     let toml_content = fs::read_to_string(&args.file).await?;
     let config: Config = toml::from_str(&toml_content)?;
 
@@ -117,7 +89,7 @@ async fn build_context() -> Result<AppContext, Box<dyn Error>> {
         None => Tz::UTC
     };
 
-    let (start_time, end_time) = build_start_and_end(&args, time_zone)?;
+    let (start_time, end_time) = args::build_start_and_end(&args, time_zone)?;
 
     let mut data_sources: Vec<DataSource> = Vec::new();
 
@@ -182,35 +154,4 @@ async fn build_context() -> Result<AppContext, Box<dyn Error>> {
     };
 
     Ok(context)
-}
-
-fn build_start_and_end(args: &Args, time_zone: Tz) -> Result<(Duration, Duration), Box<dyn Error>> {
-    let start_time: Duration;
-    let end_time: Duration;
-
-    match (&args.duration, &args.start, &args.end) {
-        // start & end are both present
-        (_, Some(s), Some(e)) => {
-            start_time = parse_date_time(s, &time_zone)?;
-            end_time = parse_date_time(e, &time_zone)?;
-        },
-        // start & end are both missing
-        (_, None, None) => {
-            end_time = SystemTime::now().duration_since(UNIX_EPOCH)?;
-            start_time = end_time.checked_sub(Duration::from_secs(args.duration)).unwrap();
-        }
-        _ => {
-            panic!("Both start and end arguments must be provided");
-        }
-    }
-
-    Ok((start_time, end_time))
-}
-
-fn parse_date_time(s: &str, time_zone: &Tz) -> Result<Duration, Box<dyn Error>> {
-    let format = "%Y-%m-%d %H:%M:%S";
-
-    Ok(NaiveDateTime::parse_from_str(s, format)
-        .map(|ndt| time_zone.from_local_datetime(&ndt).unwrap())
-        .map(|dt| Duration::from_millis(dt.timestamp_millis() as u64))?)
 }
