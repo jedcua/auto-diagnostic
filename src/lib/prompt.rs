@@ -16,8 +16,8 @@ pub const INSTRUCTION: &str = concat!(
     "You will be given pieces of information surrounded by `<data></data>` tags\n",
     "Use this information to perform a diagnosis.\n",
     "Base your diagnosis from the provided information only.\n",
-    "Use all of the information provided in your diagnosis.\n",
-    "Structure your diagnosis per information, then provide a summary at the end\n",
+    "Use all of the information provided in your diagnosis, but report only on information that needs immediate investigation/action.\n",
+    "Keep your diagnosis precise and straight to the point.\n",
     "Format your response using Markdown.\n",
     "Listed below are the information you will use:\n",
 );
