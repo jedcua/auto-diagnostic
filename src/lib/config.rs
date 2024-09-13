@@ -19,7 +19,7 @@ pub struct GeneralConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct OpenAiConfig {
-    pub api_key: String,
+    pub api_key: Option<String>,
     pub model: String,
     pub max_token: u32
 }

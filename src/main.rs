@@ -47,7 +47,7 @@ struct AppContext {
     end_time: i64,
     time_zone: Tz,
     data_sources: Vec<DataSource>,
-    open_ai_api_key: String,
+    open_ai_api_key: Option<String>,
     open_ai_model: String,
     open_ai_max_token: u32,
     print_prompt_data: bool,

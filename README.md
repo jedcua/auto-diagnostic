@@ -59,6 +59,7 @@ time_zone = 'Asia/Manila'
 
 # Required
 [open_ai]
+# Specify your API key here or set OPENAI_API_KEY environment variable
 api_key = 'your-openai-api-key'
 model = 'gpt-4o'
 max_token = 4096
