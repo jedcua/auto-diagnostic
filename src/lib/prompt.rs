@@ -1,9 +1,9 @@
 use crate::datasource::ds::DataSource::{AppDescription, CloudwatchLogInsight, CloudwatchMetric, Ec2, Rds};
 use crate::datasource::{app_description, cloudwatch_log_insight, cloudwatch_metric, ec2, rds};
-use crate::AppContext;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::error::Error;
 use std::time::Duration;
+use crate::lib::context::AppContext;
 
 #[derive(Debug)]
 pub struct PromptData {

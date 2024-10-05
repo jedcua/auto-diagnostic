@@ -1,11 +1,11 @@
 use crate::lib::config::Ec2Config;
 use crate::lib::prompt::PromptData;
-use crate::AppContext;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_ec2::types::{Filter, Instance};
 use aws_sdk_ec2::Client;
 use std::error::Error;
+use crate::lib::context::AppContext;
 
 pub async fn fetch_instance(aws_profile: &String, ec2_instance_name: & String) -> Result<Instance, Box<dyn Error>> {
     let client = init_client(aws_profile).await;

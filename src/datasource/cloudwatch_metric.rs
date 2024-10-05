@@ -1,7 +1,6 @@
 use crate::ec2::fetch_instance;
 use crate::lib::config::CloudwatchMetricConfig;
 use crate::lib::prompt::PromptData;
-use crate::AppContext;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_cloudwatch::operation::get_metric_data::GetMetricDataOutput;
@@ -10,6 +9,7 @@ use aws_sdk_cloudwatch::Client;
 use aws_smithy_types::DateTime;
 use csv::Writer;
 use std::error::Error;
+use crate::lib::context::AppContext;
 
 pub async fn fetch_data(context: &AppContext, config: &CloudwatchMetricConfig) -> Result<PromptData, Box<dyn Error>> {
     let client = init_client(&context.profile).await;

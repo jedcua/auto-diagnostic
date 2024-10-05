@@ -1,11 +1,11 @@
 use crate::lib::config::RdsConfig;
 use crate::lib::prompt::PromptData;
-use crate::AppContext;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_rds::types::DbInstance;
 use aws_sdk_rds::Client;
 use std::error::Error;
+use crate::lib::context::AppContext;
 
 pub async fn fetch_data(context: &AppContext, config: &RdsConfig) -> Result<PromptData, Box<dyn Error>> {
     let client = init_client(&context.profile).await;

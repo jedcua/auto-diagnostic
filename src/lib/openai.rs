@@ -1,10 +1,10 @@
-use crate::AppContext;
 use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
 use async_openai::Client;
 use futures::StreamExt;
 use std::env::VarError::NotPresent;
 use std::error::Error;
 use std::io::{stdout, Write};
+use crate::lib::context::AppContext;
 
 pub struct OpenAiChatInput {
     pub model: String,

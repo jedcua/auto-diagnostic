@@ -1,6 +1,5 @@
 use crate::lib::config::CloudwatchLogInsightConfig;
 use crate::lib::prompt::PromptData;
-use crate::AppContext;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_cloudwatchlogs::operation::get_query_results::GetQueryResultsOutput;
@@ -11,6 +10,7 @@ use std::error::Error;
 use std::time::Duration;
 use tokio::time::sleep;
 use QueryStatus::{Cancelled, Complete, Failed, Running, Scheduled, Timeout, UnknownValue};
+use crate::lib::context::AppContext;
 
 pub async fn fetch_data(context: &AppContext, config: &CloudwatchLogInsightConfig) -> Result<PromptData, Box<dyn Error>> {
     let client = init_client(&context.profile).await;
