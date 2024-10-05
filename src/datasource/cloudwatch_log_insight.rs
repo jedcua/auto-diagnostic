@@ -59,17 +59,17 @@ fn extract_to_csv(output: GetQueryResultsOutput, config: &CloudwatchLogInsightCo
     let mut columns_iter = config.result_columns.clone().into_iter().cycle();
     let mut column = columns_iter.next().unwrap();
 
-    for result in output.results().iter() {
+    for result in output.results() {
         let mut values : Vec<String> = Vec::new();
 
-        for result_field in result.iter() {
+        for result_field in result {
             let field = result_field.field().unwrap();
 
             if column == field {
                 values.push(result_field.value().unwrap().parse().unwrap());
-                column = columns_iter.next().unwrap()
+                column = columns_iter.next().unwrap();
             } else {
-                panic!("Expected column not matched! Expected: {} Actual {}", column, field);
+                panic!("Expected column not matched! Expected: {column} Actual {field}");
             }
         }
 

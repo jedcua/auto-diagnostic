@@ -17,7 +17,7 @@ const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
 pub async fn send_request(context: &AppContext, input: OpenAiChatInput) -> Result<(), Box<dyn Error>> {
     if let Err(NotPresent) = std::env::var(OPENAI_API_KEY) {
-        let api_key = context.open_ai_api_key.clone().expect(format!("{} variable is not set", OPENAI_API_KEY).as_str());
+        let api_key = context.open_ai_api_key.clone().unwrap_or_else(|| panic!("{OPENAI_API_KEY} variable is not set"));
         std::env::set_var(OPENAI_API_KEY, api_key);
     }
 
@@ -46,7 +46,7 @@ pub async fn send_request(context: &AppContext, input: OpenAiChatInput) -> Resul
             Ok(response) => {
                 response.choices.iter().for_each(|chat_choice| {
                     if let Some(ref content) = chat_choice.delta.content {
-                        write!(lock, "{}", content).unwrap();
+                        write!(lock, "{content}").unwrap();
                     }
                 });
             }

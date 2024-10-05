@@ -25,7 +25,7 @@ pub async fn fetch_instance(aws_profile: &String, ec2_instance_name: & String) -
         .unwrap()
         .instances()
         .first()
-        .unwrap_or_else(|| panic!("Unable to find EC2 instance with name: {}", ec2_instance_name))
+        .unwrap_or_else(|| panic!("Unable to find EC2 instance with name: {ec2_instance_name}"))
         .clone()
     )
 }

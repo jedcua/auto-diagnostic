@@ -55,7 +55,7 @@ fn extract_to_csv(context: &AppContext, output: GetMetricDataOutput) -> Result<O
     csv_writer.write_record(["timestamp", "value"])?;
     let mut rows = 0;
 
-    for result in output.metric_data_results().iter() {
+    for result in output.metric_data_results() {
         let timestamps = result.timestamps();
         let values = result.values();
 
@@ -63,7 +63,7 @@ fn extract_to_csv(context: &AppContext, output: GetMetricDataOutput) -> Result<O
             let utc_time = chrono::DateTime::from_timestamp_millis(timestamp.to_millis()?).unwrap();
             let local_time = utc_time.with_timezone(&context.time_zone);
 
-            let t = format!("{}", local_time);
+            let t = format!("{local_time}");
             let v = value.clone().to_string();
             csv_writer.write_record(&[t, v])?;
             rows += 1;

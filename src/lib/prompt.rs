@@ -35,14 +35,14 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
 
     for data_source in &context.data_sources {
         let prompt_data = match &data_source {
-            AppDescription { config, ..} => &app_description::fetch_data(config)?,
+            AppDescription { config, ..} => &app_description::fetch_data(config),
             Ec2 { config, ..} => &ec2::fetch_data(context, config).await?,
             Rds { config, ..} => &rds::fetch_data(context, config).await?,
             CloudwatchMetric { config, .. } => &cloudwatch_metric::fetch_data(context, config).await?,
             CloudwatchLogInsight { config, .. } => &cloudwatch_log_insight::fetch_data(context, config).await?
         };
 
-        progress_bar.set_message(format!("{}", data_source));
+        progress_bar.set_message(format!("{data_source}"));
 
         prompt.push_str("<data>\n");
         prompt.push_str(&prompt_data.description.join("\n"));

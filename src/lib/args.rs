@@ -41,8 +41,8 @@ pub fn build_start_and_end(args: &Args, time_zone: Tz) -> Result<(Duration, Dura
     match (&args.duration, &args.start, &args.end) {
         // start & end are both present
         (_, Some(s), Some(e)) => {
-            start_time = parse_date_time(s, &time_zone)?;
-            end_time = parse_date_time(e, &time_zone)?;
+            start_time = parse_date_time(s, time_zone)?;
+            end_time = parse_date_time(e, time_zone)?;
         },
         // start & end are both missing, use duration argument
         (_, None, None) => {
@@ -57,7 +57,7 @@ pub fn build_start_and_end(args: &Args, time_zone: Tz) -> Result<(Duration, Dura
     Ok((start_time, end_time))
 }
 
-fn parse_date_time(s: &str, time_zone: &Tz) -> Result<Duration, Box<dyn Error>> {
+fn parse_date_time(s: &str, time_zone: Tz) -> Result<Duration, Box<dyn Error>> {
     let format = "%Y-%m-%d %H:%M:%S";
 
     Ok(NaiveDateTime::parse_from_str(s, format)
@@ -85,7 +85,7 @@ mod test {
             .expect("Should not return an error");
         let diff = end.sub(start).as_secs();
 
-        assert_eq!(args.duration, diff)
+        assert_eq!(args.duration, diff);
     }
 
     #[test]
@@ -102,7 +102,7 @@ mod test {
             .expect("Should not return an error");
         let diff = end.sub(start).as_secs();
 
-        assert_eq!(86400, diff)
+        assert_eq!(86400, diff);
     }
 
     #[test]
@@ -120,6 +120,6 @@ mod test {
             build_start_and_end(&args, Tz::UTC)
         });
 
-        assert!(result.is_err())
+        assert!(result.is_err());
     }
 }
