@@ -27,7 +27,7 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
 
     let progress_bar = ProgressBar::new(context.data_sources.len() as u64);
     progress_bar.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{msg:.green}] [{wide_bar:.cyan/blue}] [{pos:.yellow}/{len:.yellow}]")
+        .template("{spinner:.green} [{msg:.green}] [{pos:.yellow}/{len:.yellow}]")
         .unwrap()
         .tick_strings(&["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌘"])
     );
