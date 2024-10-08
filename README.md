@@ -7,6 +7,7 @@
 ╚══╝    ╚═╝  ╚═╝              ╚═════╝     ╚══╝
 ```
 [![Build](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml)
+[![Coverage](https://codecov.io/github/jedcua/auto-diagnostic/branch/main/graph/badge.svg?token=FG35DKAGJW)](https://codecov.io/github/jedcua/auto-diagnostic)
 
 ## Table of Contents
 
