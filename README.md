@@ -6,7 +6,7 @@
 ███╗    ██║  ██║              ██████╔╝    ███║
 ╚══╝    ╚═╝  ╚═╝              ╚═════╝     ╚══╝
 ```
-[![Rust Build](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml)
+[![Build](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml)
 
 ## Table of Contents
 
