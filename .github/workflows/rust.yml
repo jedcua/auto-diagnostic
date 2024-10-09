@@ -49,7 +49,12 @@ jobs:
 
     - name: Install cargo-tarpaulin (if not cached)
       if: steps.cache-cargo-tarpaulin.outputs.cache-hit != 'true'
-      run: cargo install cargo-tarpaulin
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin
+        else
+          echo "cargo-tarpaulin is already installed."
+        fi
 
     - name: Run test with coverage
       run: cargo tarpaulin --out Xml
