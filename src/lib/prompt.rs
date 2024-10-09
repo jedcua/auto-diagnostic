@@ -1,9 +1,9 @@
 use crate::datasource::ds::DataSource::{AppDescription, CloudwatchLogInsight, CloudwatchMetric, Ec2, Rds};
 use crate::datasource::{app_description, cloudwatch_log_insight, cloudwatch_metric, ec2, rds};
+use crate::lib::context::AppContext;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::error::Error;
 use std::time::Duration;
-use crate::lib::context::AppContext;
 
 #[derive(Debug)]
 pub struct PromptData {
@@ -62,4 +62,30 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
     progress_bar.finish_with_message("Fetched data sources");
 
     Ok(prompt)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::lib::config::AppDescConfig;
+
+    #[tokio::test]
+    async fn should_build_prompt_data_correctly() {
+        let context = AppContext {
+            data_sources: vec![
+                AppDescription {
+                    config: AppDescConfig {
+                        order_no: 1,
+                        description: "This is an app description".to_string()
+                    },
+                }
+            ],
+            ..AppContext::default()
+        };
+
+        let prompt_data = build_prompt_data(&context).await.expect("Should build prompt data");
+        let expected_prompt_data = "<data>\nInformation: [App Description]\nThis is an app description\n</data>\n\n".to_string();
+
+        assert_eq!(prompt_data, expected_prompt_data);
+    }
 }

@@ -1,10 +1,10 @@
+use crate::lib::context::AppContext;
 use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs};
 use async_openai::Client;
 use futures::StreamExt;
 use std::env::VarError::NotPresent;
 use std::error::Error;
 use std::io::{stdout, Write};
-use crate::lib::context::AppContext;
 
 pub struct OpenAiChatInput {
     pub model: String,
@@ -17,7 +17,9 @@ const OPENAI_API_KEY: &str = "OPENAI_API_KEY";
 
 pub async fn send_request(context: &AppContext, input: OpenAiChatInput) -> Result<(), Box<dyn Error>> {
     if let Err(NotPresent) = std::env::var(OPENAI_API_KEY) {
-        let api_key = context.open_ai_api_key.clone().unwrap_or_else(|| panic!("{OPENAI_API_KEY} variable is not set"));
+        let api_key = context.open_ai_api_key
+            .clone()
+            .expect(format!("{OPENAI_API_KEY} variable is not set").as_str());
         std::env::set_var(OPENAI_API_KEY, api_key);
     }
 

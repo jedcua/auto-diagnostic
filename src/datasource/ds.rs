@@ -6,21 +6,21 @@ use DataSource::AppDescription;
 
 #[derive(Debug)]
 pub enum DataSource {
-    AppDescription { order_no: u8, config: AppDescConfig },
-    Ec2 { order_no: u8, config: Ec2Config },
-    Rds { order_no: u8, config: RdsConfig },
-    CloudwatchMetric { order_no: u8, config: CloudwatchMetricConfig },
-    CloudwatchLogInsight { order_no: u8, config: CloudwatchLogInsightConfig }
+    AppDescription { config: AppDescConfig },
+    Ec2 { config: Ec2Config },
+    Rds { config: RdsConfig },
+    CloudwatchMetric { config: CloudwatchMetricConfig },
+    CloudwatchLogInsight { config: CloudwatchLogInsightConfig }
 }
 
 impl DataSource {
     fn order_no(&self) -> u8 {
         match self {
-            AppDescription { order_no, ..} => *order_no,
-            Ec2 { order_no, .. } => *order_no,
-            Rds { order_no, .. } => *order_no,
-            CloudwatchMetric { order_no, .. } => *order_no,
-            CloudwatchLogInsight { order_no, .. } => *order_no,
+            AppDescription { config, ..} => config.order_no,
+            Ec2 { config, .. } => config.order_no,
+            Rds { config, .. } => config.order_no,
+            CloudwatchMetric { config, .. } => config.order_no,
+            CloudwatchLogInsight { config, .. } => config.order_no,
         }
     }
 }
@@ -34,7 +34,7 @@ impl fmt::Display for DataSource {
             CloudwatchMetric { .. } => "Cloudwatch metric".to_string(),
             CloudwatchLogInsight { .. } => "Cloudwatch log insight".to_string(),
         };
-        write!(f, "{}", display_string)
+        write!(f, "{display_string}")
     }
 }
 

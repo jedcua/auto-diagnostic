@@ -6,6 +6,7 @@ use crate::lib::args;
 use crate::lib::args::Args;
 use crate::lib::config::Config;
 
+#[derive(Default)]
 pub struct AppContext {
     pub profile: String,
     pub start_time: i64,
@@ -32,7 +33,6 @@ pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn E
     if let Some(configs) = config.app_description {
         for app_desc_config in configs {
             data_sources.push(AppDescription {
-                order_no: app_desc_config.order_no,
                 config: app_desc_config
             });
         }
@@ -41,7 +41,6 @@ pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn E
     if let Some(configs) = config.ec2 {
         for ec2_config in configs {
             data_sources.push(Ec2 {
-                order_no: ec2_config.order_no,
                 config: ec2_config
             });
         }
@@ -50,7 +49,6 @@ pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn E
     if let Some(configs) = config.rds {
         for rds_config in configs {
             data_sources.push(Rds {
-                order_no: rds_config.order_no,
                 config: rds_config
             });
         }
@@ -59,7 +57,6 @@ pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn E
     if let Some(configs) = config.cloudwatch_metric {
         for cloudwatch_config in configs {
             data_sources.push(CloudwatchMetric {
-                order_no: cloudwatch_config.order_no,
                 config: cloudwatch_config
             });
         }
@@ -68,7 +65,6 @@ pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn E
     if let Some(configs) = config.cloudwatch_log_insight {
         for cloudwatch_config in configs {
             data_sources.push(CloudwatchLogInsight {
-                order_no: cloudwatch_config.order_no,
                 config: cloudwatch_config
             });
         }
