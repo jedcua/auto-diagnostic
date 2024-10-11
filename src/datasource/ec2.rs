@@ -1,11 +1,11 @@
 use crate::lib::config::Ec2Config;
+use crate::lib::context::AppContext;
 use crate::lib::prompt::PromptData;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_ec2::types::{Filter, Instance};
 use aws_sdk_ec2::Client;
 use std::error::Error;
-use crate::lib::context::AppContext;
 
 pub async fn fetch_instance(aws_profile: &String, ec2_instance_name: & String) -> Result<Instance, Box<dyn Error>> {
     let client = init_client(aws_profile).await;
@@ -67,4 +67,42 @@ async fn init_client(aws_profile: &String) -> Client {
         .await;
 
     Client::new(&config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aws_sdk_ec2::types::builders::InstanceBuilder;
+    use aws_sdk_ec2::types::{CpuOptions, InstanceState, InstanceStateName, InstanceType};
+
+    #[test]
+    fn test_build_description() {
+        let config = Ec2Config {
+            order_no: 1,
+            instance_name: "ec2-instance".to_string()
+        };
+
+        let instance = InstanceBuilder::default()
+            .instance_type(InstanceType::T3aMedium)
+            .cpu_options(CpuOptions::builder()
+                .core_count(1)
+                .threads_per_core(2)
+                .build()
+            )
+            .state(InstanceState::builder()
+                .name(InstanceStateName::Running)
+                .build()
+            )
+            .build();
+
+        let descriptions = build_description(&config, instance);
+        
+        assert_eq!(descriptions.len(), 6);
+        assert_eq!(descriptions[0], "Information: [EC2 Instance]".to_string());
+        assert_eq!(descriptions[1], "Instance name: [`ec2-instance`]".to_string());
+        assert_eq!(descriptions[2], "Instance type: [`t3a.medium`]".to_string());
+        assert_eq!(descriptions[3], "Cpu core count: [1]".to_string());
+        assert_eq!(descriptions[4], "Cpu threads per core: [2]".to_string());
+        assert_eq!(descriptions[5], "State: [running]".to_string());
+    }
 }

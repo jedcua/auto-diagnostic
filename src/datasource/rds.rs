@@ -1,11 +1,11 @@
 use crate::lib::config::RdsConfig;
+use crate::lib::context::AppContext;
 use crate::lib::prompt::PromptData;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_rds::types::DbInstance;
 use aws_sdk_rds::Client;
 use std::error::Error;
-use crate::lib::context::AppContext;
 
 pub async fn fetch_data(context: &AppContext, config: &RdsConfig) -> Result<PromptData, Box<dyn Error>> {
     let client = init_client(&context.profile).await;
@@ -48,4 +48,37 @@ async fn init_client(aws_profile: &String) -> Client {
         .await;
 
     Client::new(&config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_description() {
+        let config = RdsConfig {
+            order_no: 1,
+            db_identifier: "db-identifier-name".to_string(),
+        };
+
+        let instance = DbInstance::builder()
+            .db_instance_class("db.t4g.medium")
+            .engine("postgresql")
+            .engine_version("16.1")
+            .storage_type("some storage")
+            .db_instance_status("running")
+            .multi_az(true)
+            .build();
+
+        let description = build_description(&config, &instance);
+
+        assert_eq!(description.len(), 7);
+        assert_eq!(description.get(0).unwrap(), "Information: [RDS Instance]");
+        assert_eq!(description.get(1).unwrap(), "DB identifier: [`db-identifier-name`]");
+        assert_eq!(description.get(2).unwrap(), "Class: [`db.t4g.medium`]");
+        assert_eq!(description.get(3).unwrap(), "Engine: [postgresql 16.1]");
+        assert_eq!(description.get(4).unwrap(), "Storage type: [some storage]");
+        assert_eq!(description.get(5).unwrap(), "Status: [running]");
+        assert_eq!(description.get(6).unwrap(), "Multi AZ: [true]");
+    }
 }
