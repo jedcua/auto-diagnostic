@@ -9,15 +9,20 @@ use crate::lib::config::Config;
 #[derive(Default)]
 pub struct AppContext {
     pub profile: String,
-    pub start_time: i64,
-    pub end_time: i64,
-    pub time_zone: Tz,
+    pub range: DateTimeRange,
     pub data_sources: Vec<DataSource>,
     pub open_ai_api_key: Option<String>,
     pub open_ai_model: String,
     pub open_ai_max_token: u32,
     pub print_prompt_data: bool,
     pub dry_run: bool
+}
+
+#[derive(Default)]
+pub struct DateTimeRange {
+    pub start_time: i64,
+    pub end_time: i64,
+    pub time_zone: Tz,
 }
 
 pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn Error>> {
@@ -74,9 +79,11 @@ pub fn build_context(args: Args, config: Config) -> Result<AppContext, Box<dyn E
 
     let context = AppContext {
         profile: String::from(&config.general.profile),
-        start_time: start_time.as_millis() as i64,
-        end_time: end_time.as_millis() as i64,
-        time_zone,
+        range: DateTimeRange {
+            start_time: start_time.as_millis() as i64,
+            end_time: end_time.as_millis() as i64,
+            time_zone,
+        },
         data_sources,
         open_ai_api_key: config.open_ai.api_key,
         open_ai_model: config.open_ai.model,
@@ -161,7 +168,7 @@ mod test {
         ).unwrap();
 
         assert_eq!(context.profile, "aws-profile");
-        assert_eq!(context.time_zone, Tz::Asia__Manila);
+        assert_eq!(context.range.time_zone, Tz::Asia__Manila);
         assert_eq!(context.open_ai_api_key, Some("openai-api-key".to_string()));
         assert_eq!(context.open_ai_model, "gpt-4o".to_string());
         assert_eq!(context.open_ai_max_token, 4096);

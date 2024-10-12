@@ -1,18 +1,24 @@
 use crate::lib::config::RdsConfig;
-use crate::lib::context::AppContext;
 use crate::lib::prompt::PromptData;
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::BehaviorVersion;
+use aws_sdk_rds::operation::describe_db_instances::DescribeDbInstancesOutput;
 use aws_sdk_rds::types::DbInstance;
 use aws_sdk_rds::Client;
 use std::error::Error;
 
-pub async fn fetch_data(context: &AppContext, config: &RdsConfig) -> Result<PromptData, Box<dyn Error>> {
-    let client = init_client(&context.profile).await;
+pub trait RdsClient {
+    async fn describe_db_instances(&self) -> Result<DescribeDbInstancesOutput, Box<dyn Error>>;
+}
 
-    let response = client.describe_db_instances()
-        .send()
-        .await?;
+impl RdsClient for Client {
+    async fn describe_db_instances(&self) -> Result<DescribeDbInstancesOutput, Box<dyn Error>> {
+        Ok(self.describe_db_instances()
+            .send()
+            .await?)
+    }
+}
+
+pub async fn fetch_data(client: impl RdsClient, config: &RdsConfig) -> Result<PromptData, Box<dyn Error>> {
+    let response = client.describe_db_instances().await?;
 
     for db_instance in response.db_instances.unwrap_or_default() {
         let name = db_instance.db_instance_identifier.clone().unwrap_or_default();
@@ -37,17 +43,6 @@ fn build_description(config: &RdsConfig, instance: &DbInstance) -> Vec<String> {
         format!("Status: [{}]", instance.db_instance_status().unwrap()),
         format!("Multi AZ: [{}]", instance.multi_az().unwrap()),
     ]
-}
-
-async fn init_client(aws_profile: &String) -> Client {
-    let region_provider = RegionProviderChain::default_provider();
-    let config = aws_config::defaults(BehaviorVersion::latest())
-        .region(region_provider)
-        .profile_name(aws_profile)
-        .load()
-        .await;
-
-    Client::new(&config)
 }
 
 #[cfg(test)]

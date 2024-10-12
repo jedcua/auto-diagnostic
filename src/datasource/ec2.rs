@@ -1,24 +1,30 @@
 use crate::lib::config::Ec2Config;
-use crate::lib::context::AppContext;
 use crate::lib::prompt::PromptData;
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::BehaviorVersion;
+use aws_sdk_ec2::operation::describe_instances::DescribeInstancesOutput;
 use aws_sdk_ec2::types::{Filter, Instance};
-use aws_sdk_ec2::Client;
 use std::error::Error;
+use aws_sdk_ec2::Client;
 
-pub async fn fetch_instance(aws_profile: &String, ec2_instance_name: &String) -> Result<Instance, Box<dyn Error>> {
-    let client = init_client(aws_profile).await;
+pub trait Ec2Client {
+    async fn describe_instances(&self, filter: Filter) -> Result<DescribeInstancesOutput, Box<dyn Error>>;
+}
 
+impl Ec2Client for Client {
+    async fn describe_instances(&self, filter: Filter) -> Result<DescribeInstancesOutput, Box<dyn Error>> {
+        Ok(self.describe_instances()
+            .filters(filter)
+            .send()
+            .await?)
+    }
+}
+
+pub async fn fetch_instance(client: impl Ec2Client, ec2_instance_name: &String) -> Result<Instance, Box<dyn Error>> {
     let filter = Filter::builder()
         .name("tag:Name")
         .values(ec2_instance_name)
         .build();
 
-    let response = client.describe_instances()
-        .filters(filter)
-        .send()
-        .await?;
+    let response = client.describe_instances(filter).await?;
 
     Ok(response.reservations()
         .first()
@@ -30,8 +36,8 @@ pub async fn fetch_instance(aws_profile: &String, ec2_instance_name: &String) ->
     )
 }
 
-pub async fn fetch_data(context: &AppContext, config: &Ec2Config) -> Result<PromptData, Box<dyn Error>> {
-    let instance = fetch_instance(&context.profile, &config.instance_name).await?;
+pub async fn fetch_data(client: impl Ec2Client, config: &Ec2Config) -> Result<PromptData, Box<dyn Error>> {
+    let instance = fetch_instance(client, &config.instance_name).await?;
 
     Ok(PromptData {
         description: build_description(config, instance),
@@ -56,17 +62,6 @@ fn build_description(config: &Ec2Config, instance: Instance) -> Vec<String> {
         format!("Cpu threads per core: [{}]", cpu.threads_per_core().unwrap()),
         format!("State: [{instance_state}]"),
     ]
-}
-
-async fn init_client(aws_profile: &String) -> Client {
-    let region_provider = RegionProviderChain::default_provider();
-    let config = aws_config::defaults(BehaviorVersion::latest())
-        .region(region_provider)
-        .profile_name(aws_profile)
-        .load()
-        .await;
-
-    Client::new(&config)
 }
 
 #[cfg(test)]

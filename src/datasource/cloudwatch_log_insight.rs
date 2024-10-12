@@ -1,9 +1,8 @@
 use crate::lib::config::CloudwatchLogInsightConfig;
-use crate::lib::context::AppContext;
+use crate::lib::context::{DateTimeRange};
 use crate::lib::prompt::PromptData;
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::BehaviorVersion;
 use aws_sdk_cloudwatchlogs::operation::get_query_results::GetQueryResultsOutput;
+use aws_sdk_cloudwatchlogs::operation::start_query::StartQueryOutput;
 use aws_sdk_cloudwatchlogs::types::QueryStatus;
 use aws_sdk_cloudwatchlogs::Client;
 use csv::Writer;
@@ -12,26 +11,48 @@ use std::time::Duration;
 use tokio::time::sleep;
 use QueryStatus::{Cancelled, Complete, Failed, Running, Scheduled, Timeout, UnknownValue};
 
-pub async fn fetch_data(context: &AppContext, config: &CloudwatchLogInsightConfig) -> Result<PromptData, Box<dyn Error>> {
-    let client = init_client(&context.profile).await;
+pub trait CloudwatchLogsClient {
+    async fn start_query(&self, log_group_name: &str, query: &str, start_time: i64, end_time: i64) -> Result<StartQueryOutput, Box<dyn Error>>;
 
-    let start_time = context.start_time;
-    let end_time = context.end_time;
+    async fn get_query_results(&self, query_id: String) -> Result<GetQueryResultsOutput, Box<dyn Error>>;
+}
 
-    let response = client.start_query()
-        .log_group_name(&config.log_group_name)
-        .query_string(&config.query)
-        .start_time(start_time)
-        .end_time(end_time)
-        .send()
-        .await?;
+impl CloudwatchLogsClient for Client {
+    async fn start_query(&self, log_group_name: &str, query: &str, start_time: i64, end_time: i64) -> Result<StartQueryOutput, Box<dyn Error>> {
+        Ok(self.start_query()
+            .log_group_name(log_group_name)
+            .query_string(query)
+            .start_time(start_time)
+            .end_time(end_time)
+            .send()
+            .await?)
+    }
+
+    async fn get_query_results(&self, query_id: String) -> Result<GetQueryResultsOutput, Box<dyn Error>> {
+        Ok(self.get_query_results()
+            .query_id(query_id)
+            .send()
+            .await?)
+    }
+}
+
+pub async fn fetch_data(client: impl CloudwatchLogsClient, config: &CloudwatchLogInsightConfig, range: &DateTimeRange) -> Result<PromptData, Box<dyn Error>> {
+    let start_time = range.start_time;
+    let end_time = range.end_time;
+
+    let response = client.start_query(
+        &config.log_group_name,
+        &config.query,
+        start_time,
+        end_time
+    ).await?;
 
     let query_id = response.query_id().expect("Query Id is missing from response");
 
     let mut poll_response;
 
     loop {
-        poll_response = client.get_query_results().query_id(query_id).send().await?;
+        poll_response = client.get_query_results(String::from(query_id)).await?;
 
         match poll_response.status().unwrap() {
             Complete => break,
@@ -88,21 +109,10 @@ fn extract_to_csv(output: GetQueryResultsOutput, config: &CloudwatchLogInsightCo
     Ok(Some(csv))
 }
 
-async fn init_client(aws_profile: &String) -> Client {
-    let region_provider = RegionProviderChain::default_provider();
-    let config = aws_config::defaults(BehaviorVersion::latest())
-        .region(region_provider)
-        .profile_name(aws_profile)
-        .load()
-        .await;
-
-    Client::new(&config)
-}
-
 #[cfg(test)]
 mod tests {
-    use aws_sdk_cloudwatchlogs::types::ResultField;
     use super::*;
+    use aws_sdk_cloudwatchlogs::types::ResultField;
 
     #[test]
     fn test_build_description() {

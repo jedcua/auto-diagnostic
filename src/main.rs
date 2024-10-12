@@ -14,7 +14,6 @@ mod lib {
     pub mod openai;
 }
 
-use crate::datasource::ec2;
 use crate::lib::config::Config;
 use crate::lib::context::build_context;
 use crate::lib::openai::OpenAiChatInput;

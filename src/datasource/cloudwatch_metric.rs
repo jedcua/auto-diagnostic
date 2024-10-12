@@ -1,23 +1,34 @@
-use crate::ec2::fetch_instance;
 use crate::lib::config::CloudwatchMetricConfig;
+use crate::lib::context::{DateTimeRange};
 use crate::lib::prompt::PromptData;
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::BehaviorVersion;
 use aws_sdk_cloudwatch::operation::get_metric_data::GetMetricDataOutput;
 use aws_sdk_cloudwatch::types::{Dimension, Metric, MetricDataQuery, MetricStat};
 use aws_sdk_cloudwatch::Client;
 use aws_smithy_types::DateTime;
 use csv::Writer;
 use std::error::Error;
-use crate::lib::context::AppContext;
+use crate::datasource::ec2::{fetch_instance, Ec2Client};
 
-pub async fn fetch_data(context: &AppContext, config: &CloudwatchMetricConfig) -> Result<PromptData, Box<dyn Error>> {
-    let client = init_client(&context.profile).await;
+pub trait CloudwatchClient {
+    async fn get_metric_data(&self, start_time: DateTime, end_time: DateTime, query: MetricDataQuery) -> Result<GetMetricDataOutput, Box<dyn Error>>;
+}
 
+impl CloudwatchClient for Client {
+    async fn get_metric_data(&self, start_time: DateTime, end_time: DateTime, query: MetricDataQuery) -> Result<GetMetricDataOutput, Box<dyn Error>> {
+        Ok(self.get_metric_data()
+            .start_time(start_time)
+            .end_time(end_time)
+            .metric_data_queries(query)
+            .send()
+            .await?)
+    }
+}
+
+pub async fn fetch_data(client: impl CloudwatchClient, ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig, range: &DateTimeRange) -> Result<PromptData, Box<dyn Error>> {
     let metric = Metric::builder()
         .metric_name(&config.metric_name)
         .namespace(&config.metric_namespace)
-        .dimensions(build_dimension(&context.profile, config).await?)
+        .dimensions(build_dimension(ec2_client, config).await?)
         .build();
 
     let metric_stat = MetricStat::builder()
@@ -26,23 +37,19 @@ pub async fn fetch_data(context: &AppContext, config: &CloudwatchMetricConfig) -
         .period(60)
         .build();
 
-    let start_time = DateTime::from_millis(context.start_time);
-    let end_time = DateTime::from_millis(context.end_time);
+    let query = MetricDataQuery::builder()
+        .id(&config.metric_identifier)
+        .metric_stat(metric_stat)
+        .build();
 
-    let response = client.get_metric_data()
-        .start_time(start_time)
-        .end_time(end_time)
-        .metric_data_queries(MetricDataQuery::builder()
-            .id(&config.metric_identifier)
-            .metric_stat(metric_stat)
-            .build()
-        )
-        .send()
-        .await?;
+    let start_time = DateTime::from_millis(range.start_time);
+    let end_time = DateTime::from_millis(range.end_time);
+
+    let response = client.get_metric_data(start_time, end_time, query).await?;
 
     Ok(PromptData {
         description: build_description(config),
-        data: extract_to_csv(context, response)?
+        data: extract_to_csv(range, response)?
     })
 }
 
@@ -54,7 +61,7 @@ fn build_description(config: &CloudwatchMetricConfig) -> Vec<String> {
     ]
 }
 
-fn extract_to_csv(context: &AppContext, output: GetMetricDataOutput) -> Result<Option<String>, Box<dyn Error>> {
+fn extract_to_csv(range: &DateTimeRange, output: GetMetricDataOutput) -> Result<Option<String>, Box<dyn Error>> {
     let mut csv_writer = Writer::from_writer(Vec::new());
     csv_writer.write_record(["timestamp", "value"])?;
     let mut rows = 0;
@@ -65,7 +72,7 @@ fn extract_to_csv(context: &AppContext, output: GetMetricDataOutput) -> Result<O
 
         for (timestamp, value) in timestamps.iter().rev().zip(values.iter().rev()) {
             let utc_time = chrono::DateTime::from_timestamp_millis(timestamp.to_millis()?).unwrap();
-            let local_time = utc_time.with_timezone(&context.time_zone);
+            let local_time = utc_time.with_timezone(&range.time_zone);
 
             let t = format!("{local_time}");
             let v = value.clone().to_string();
@@ -82,12 +89,12 @@ fn extract_to_csv(context: &AppContext, output: GetMetricDataOutput) -> Result<O
     Ok(Some(csv))
 }
 
-async fn build_dimension(aws_profile: &String, config: &CloudwatchMetricConfig) -> Result<Dimension, Box<dyn Error>> {
+async fn build_dimension(ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig) -> Result<Dimension, Box<dyn Error>> {
     let dimension_value;
 
     // If EC2, fetch convert instance name to instance id first
     if config.metric_namespace == "AWS/EC2" {
-        let ec2_instance = fetch_instance(aws_profile, &config.dimension_value).await?;
+        let ec2_instance = fetch_instance(ec2_client, &config.dimension_value).await?;
         dimension_value = ec2_instance.instance_id().unwrap().to_string();
     } else {
         dimension_value = config.dimension_value.clone();
@@ -99,23 +106,13 @@ async fn build_dimension(aws_profile: &String, config: &CloudwatchMetricConfig) 
         .build())
 }
 
-async fn init_client(aws_profile: &String) -> Client {
-    let region_provider = RegionProviderChain::default_provider();
-    let config = aws_config::defaults(BehaviorVersion::latest())
-        .region(region_provider)
-        .profile_name(aws_profile)
-        .load()
-        .await;
-
-    Client::new(&config)
-}
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     use aws_sdk_cloudwatch::types::MetricDataResult;
     use aws_smithy_types::date_time::Format;
     use chrono_tz::Tz;
-    use super::*;
+    use crate::lib::context::AppContext;
 
     #[test]
     fn test_build_description() {
@@ -140,7 +137,7 @@ mod tests {
         let context = AppContext { ..AppContext::default() };
         let output = GetMetricDataOutput::builder().build();
 
-        let result = extract_to_csv(&context, output).expect("Should extract to csv");
+        let result = extract_to_csv(&context.range, output).expect("Should extract to csv");
 
         assert_eq!(result, Some("No applicable data found\n".to_string()));
     }
@@ -148,7 +145,10 @@ mod tests {
     #[test]
     fn test_extract_to_csv() {
         let context = AppContext {
-            time_zone: Tz::Asia__Manila,
+            range: DateTimeRange {
+                time_zone: Tz::Asia__Manila,
+                ..DateTimeRange::default()
+            },
             ..AppContext::default()
         };
         let output = GetMetricDataOutput::builder()
@@ -168,7 +168,7 @@ mod tests {
                 .build())
             .build();
 
-        let result = extract_to_csv(&context, output).expect("Should extract to csv");
+        let result = extract_to_csv(&context.range, output).expect("Should extract to csv");
 
         let expected = [
             "timestamp,value\n",
