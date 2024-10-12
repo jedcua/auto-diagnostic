@@ -75,7 +75,7 @@ fn extract_to_csv(context: &AppContext, output: GetMetricDataOutput) -> Result<O
     }
 
     if rows ==  0 {
-        return Ok(Some("No applicable data captured\n".to_string()))
+        return Ok(Some("No applicable data found\n".to_string()))
     }
 
     let csv = String::from_utf8(csv_writer.into_inner()?)?;
@@ -142,7 +142,7 @@ mod tests {
 
         let result = extract_to_csv(&context, output).expect("Should extract to csv");
 
-        assert_eq!(result, Some("No applicable data captured\n".to_string()));
+        assert_eq!(result, Some("No applicable data found\n".to_string()));
     }
 
     #[test]

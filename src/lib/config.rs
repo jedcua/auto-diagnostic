@@ -53,7 +53,7 @@ pub struct CloudwatchMetricConfig {
     pub metric_stat: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct CloudwatchLogInsightConfig {
     pub order_no: u8,
     pub description: String,
