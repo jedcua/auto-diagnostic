@@ -42,7 +42,7 @@ pub struct RdsConfig {
     pub db_identifier: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct CloudwatchMetricConfig {
     pub order_no: u8,
     pub dimension_name: String,
