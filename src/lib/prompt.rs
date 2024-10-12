@@ -1,5 +1,3 @@
-use crate::datasource::ds::DataSource::{AppDescription, CloudwatchLogInsight, CloudwatchMetric, Ec2, Rds};
-use crate::datasource::{app_description, cloudwatch_log_insight, cloudwatch_metric, ec2, rds};
 use crate::lib::context::AppContext;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::error::Error;
@@ -34,13 +32,7 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
     progress_bar.enable_steady_tick(Duration::from_millis(100));
 
     for data_source in &context.data_sources {
-        let prompt_data = match &data_source {
-            AppDescription { config, ..} => &app_description::fetch_data(config),
-            Ec2 { config, ..} => &ec2::fetch_data(context, config).await?,
-            Rds { config, ..} => &rds::fetch_data(context, config).await?,
-            CloudwatchMetric { config, .. } => &cloudwatch_metric::fetch_data(context, config).await?,
-            CloudwatchLogInsight { config, .. } => &cloudwatch_log_insight::fetch_data(context, config).await?
-        };
+        let prompt_data = data_source.fetch_data(context).await?;
 
         progress_bar.set_message(format!("{data_source}"));
 
@@ -68,6 +60,7 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
 mod test {
     use super::*;
     use crate::lib::config::AppDescConfig;
+    use crate::datasource::ds::DataSource::AppDescription;
 
     #[tokio::test]
     async fn should_build_prompt_data_correctly() {

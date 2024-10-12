@@ -1,6 +1,10 @@
 use crate::datasource::ds::DataSource::{CloudwatchLogInsight, CloudwatchMetric, Ec2, Rds};
+use crate::datasource::{app_description, cloudwatch_log_insight, cloudwatch_metric, ec2, rds};
 use crate::lib::config::{AppDescConfig, CloudwatchLogInsightConfig, CloudwatchMetricConfig, Ec2Config, RdsConfig};
+use crate::lib::context::AppContext;
+use crate::lib::prompt::PromptData;
 use std::cmp::Ordering;
+use std::error::Error;
 use std::fmt;
 use DataSource::AppDescription;
 
@@ -22,6 +26,18 @@ impl DataSource {
             CloudwatchMetric { config, .. } => config.order_no,
             CloudwatchLogInsight { config, .. } => config.order_no,
         }
+    }
+
+    pub async fn fetch_data(&self, context: &AppContext) -> Result<PromptData, Box<dyn Error>> {
+        let prompt_data = match self {
+            AppDescription { config} => app_description::fetch_data(config),
+            Ec2 { config } => ec2::fetch_data(context, config).await?,
+            Rds { config } => rds::fetch_data(context, config).await?,
+            CloudwatchMetric { config } => cloudwatch_metric::fetch_data(context, config).await?,
+            CloudwatchLogInsight { config } => cloudwatch_log_insight::fetch_data(context, config).await?
+        };
+
+        Ok(prompt_data)
     }
 }
 
