@@ -107,7 +107,7 @@ mod tests {
         assert_eq!(prompt_data.description[3], "Cpu core count: [1]".to_string());
         assert_eq!(prompt_data.description[4], "Cpu threads per core: [2]".to_string());
         assert_eq!(prompt_data.description[5], "State: [running]".to_string());
-        assert_eq!(prompt_data.data.is_none(), true)
+        assert!(prompt_data.data.is_none());
     }
 
     struct NoInstanceEc2Client { }

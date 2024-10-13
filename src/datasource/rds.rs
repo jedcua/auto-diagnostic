@@ -49,31 +49,60 @@ fn build_description(config: &RdsConfig, instance: &DbInstance) -> Vec<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_build_description() {
+    struct MockRdsClient {
+        db_instance_identifier: String,
+    }
+
+    impl RdsClient for MockRdsClient {
+        async fn describe_db_instances(&self) -> Result<DescribeDbInstancesOutput, Box<dyn Error>> {
+            Ok(DescribeDbInstancesOutput::builder()
+                .db_instances(DbInstance::builder()
+                    .db_instance_identifier(&self.db_instance_identifier)
+                    .db_instance_class("db.t4g.medium")
+                    .engine("postgresql")
+                    .engine_version("16.1")
+                    .storage_type("some storage")
+                    .db_instance_status("running")
+                    .multi_az(true)
+                    .build())
+                .build())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_data() {
+        let client = MockRdsClient {
+            db_instance_identifier: "db-identifier-name".to_string()
+        };
         let config = RdsConfig {
             order_no: 1,
             db_identifier: "db-identifier-name".to_string(),
         };
 
-        let instance = DbInstance::builder()
-            .db_instance_class("db.t4g.medium")
-            .engine("postgresql")
-            .engine_version("16.1")
-            .storage_type("some storage")
-            .db_instance_status("running")
-            .multi_az(true)
-            .build();
+        let prompt_data = fetch_data(client, &config).await.expect("Should be able to fetch data");
 
-        let description = build_description(&config, &instance);
+        assert_eq!(prompt_data.description.len(), 7);
+        assert_eq!(prompt_data.description.get(0).unwrap(), "Information: [RDS Instance]");
+        assert_eq!(prompt_data.description.get(1).unwrap(), "DB identifier: [`db-identifier-name`]");
+        assert_eq!(prompt_data.description.get(2).unwrap(), "Class: [`db.t4g.medium`]");
+        assert_eq!(prompt_data.description.get(3).unwrap(), "Engine: [postgresql 16.1]");
+        assert_eq!(prompt_data.description.get(4).unwrap(), "Storage type: [some storage]");
+        assert_eq!(prompt_data.description.get(5).unwrap(), "Status: [running]");
+        assert_eq!(prompt_data.description.get(6).unwrap(), "Multi AZ: [true]");
+        assert!(prompt_data.data.is_none());
+    }
 
-        assert_eq!(description.len(), 7);
-        assert_eq!(description.get(0).unwrap(), "Information: [RDS Instance]");
-        assert_eq!(description.get(1).unwrap(), "DB identifier: [`db-identifier-name`]");
-        assert_eq!(description.get(2).unwrap(), "Class: [`db.t4g.medium`]");
-        assert_eq!(description.get(3).unwrap(), "Engine: [postgresql 16.1]");
-        assert_eq!(description.get(4).unwrap(), "Storage type: [some storage]");
-        assert_eq!(description.get(5).unwrap(), "Status: [running]");
-        assert_eq!(description.get(6).unwrap(), "Multi AZ: [true]");
+    #[tokio::test]
+    #[should_panic(expected = "Unable to find DB instance with name: db-identifier-name-1")]
+    async fn test_fetch_data_not_found() {
+        let client = MockRdsClient {
+            db_instance_identifier: "db-identifier-name-2".to_string()
+        };
+        let config = RdsConfig {
+            order_no: 1,
+            db_identifier: "db-identifier-name-1".to_string(),
+        };
+
+        fetch_data(client, &config).await.expect("Should be able to fetch data");
     }
 }
