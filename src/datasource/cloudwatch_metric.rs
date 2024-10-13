@@ -1,5 +1,6 @@
+use crate::datasource::ec2::{fetch_instance, Ec2Client};
 use crate::lib::config::CloudwatchMetricConfig;
-use crate::lib::context::{DateTimeRange};
+use crate::lib::context::DateTimeRange;
 use crate::lib::prompt::PromptData;
 use aws_sdk_cloudwatch::operation::get_metric_data::GetMetricDataOutput;
 use aws_sdk_cloudwatch::types::{Dimension, Metric, MetricDataQuery, MetricStat};
@@ -7,7 +8,6 @@ use aws_sdk_cloudwatch::Client;
 use aws_smithy_types::DateTime;
 use csv::Writer;
 use std::error::Error;
-use crate::datasource::ec2::{fetch_instance, Ec2Client};
 
 pub trait CloudwatchClient {
     async fn get_metric_data(&self, start_time: DateTime, end_time: DateTime, query: MetricDataQuery) -> Result<GetMetricDataOutput, Box<dyn Error>>;
@@ -109,10 +109,10 @@ async fn build_dimension(ec2_client: impl Ec2Client, config: &CloudwatchMetricCo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::datasource::ec2::tests::MockEc2Client;
     use aws_sdk_cloudwatch::types::MetricDataResult;
     use aws_smithy_types::date_time::Format;
     use chrono_tz::Tz;
-    use crate::lib::context::AppContext;
 
     #[test]
     fn test_build_description() {
@@ -134,41 +134,59 @@ mod tests {
 
     #[test]
     fn test_extract_to_csv_empty_row() {
-        let context = AppContext { ..AppContext::default() };
+        let range = DateTimeRange::default();
         let output = GetMetricDataOutput::builder().build();
 
-        let result = extract_to_csv(&context.range, output).expect("Should extract to csv");
+        let result = extract_to_csv(&range, output).expect("Should extract to csv");
 
         assert_eq!(result, Some("No applicable data found\n".to_string()));
     }
 
-    #[test]
-    fn test_extract_to_csv() {
-        let context = AppContext {
-            range: DateTimeRange {
-                time_zone: Tz::Asia__Manila,
-                ..DateTimeRange::default()
-            },
-            ..AppContext::default()
-        };
-        let output = GetMetricDataOutput::builder()
-            .metric_data_results(MetricDataResult::builder()
-                .timestamps(date_time("2023-10-12T09:30:00Z"))
-                .values(1.0)
+    struct MockCloudwatchClient {}
 
-                .timestamps(date_time("2023-10-12T10:00:00Z"))
-                .values(2.0)
+    impl CloudwatchClient for MockCloudwatchClient {
+        async fn get_metric_data(&self, _: DateTime, _: DateTime, _: MetricDataQuery) -> Result<GetMetricDataOutput, Box<dyn Error>> {
+            Ok(GetMetricDataOutput::builder()
+                .metric_data_results(MetricDataResult::builder()
+                    .timestamps(date_time("2023-10-12T09:30:00Z"))
+                    .values(1.0)
 
-                .timestamps(date_time("2023-10-12T10:30:00Z"))
-                .values(3.0)
+                    .timestamps(date_time("2023-10-12T10:00:00Z"))
+                    .values(2.0)
 
-                .timestamps(date_time("2023-10-12T11:00:00Z"))
-                .values(4.0)
+                    .timestamps(date_time("2023-10-12T10:30:00Z"))
+                    .values(3.0)
 
+                    .timestamps(date_time("2023-10-12T11:00:00Z"))
+                    .values(4.0)
+
+                    .build())
                 .build())
-            .build();
+        }
+    }
 
-        let result = extract_to_csv(&context.range, output).expect("Should extract to csv");
+    #[tokio::test]
+    async fn test_fetch_data() {
+        let client = MockCloudwatchClient {};
+        let ec2_client = MockEc2Client {
+            instance_id: "ec2-instance-id".to_string()
+        };
+
+        let config = CloudwatchMetricConfig {
+            metric_namespace: "AWS/EC2".to_string(),
+            metric_name: "CPUUtilization".to_string(),
+            dimension_name: "InstanceId".to_string(),
+            dimension_value: "ec2-instance-name".to_string(),
+            ..CloudwatchMetricConfig::default()
+        };
+
+        let range = DateTimeRange {
+            start_time: date_time("2023-10-12T09:30:00Z").to_millis().unwrap(),
+            end_time: date_time("2023-10-12T11:00:00Z").to_millis().unwrap(),
+            time_zone: Tz::Asia__Manila,
+        };
+
+        let prompt_data = fetch_data(client, ec2_client, &config, &range).await.expect("Should fetch data");
 
         let expected = [
             "timestamp,value\n",
@@ -178,7 +196,11 @@ mod tests {
             "2023-10-12 17:30:00 PST,1\n"
         ].join("");
 
-        assert_eq!(result, Some(expected));
+        assert_eq!(prompt_data.description.len(), 3);
+        assert_eq!(prompt_data.description[0], "Information: [Cloudwatch AWS/EC2]".to_string());
+        assert_eq!(prompt_data.description[1], "Metric: [`CPUUtilization`]".to_string());
+        assert_eq!(prompt_data.description[2], "Dimension: [`InstanceId:ec2-instance-name`]".to_string());
+        assert_eq!(prompt_data.data, Some(expected));
     }
 
     fn date_time(s: &str) -> DateTime {

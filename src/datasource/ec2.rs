@@ -65,17 +65,20 @@ fn build_description(config: &Ec2Config, instance: Instance) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use aws_sdk_ec2::types::{CpuOptions, InstanceState, InstanceStateName, InstanceType, Reservation};
 
-    struct MockEc2Client { }
+    pub struct MockEc2Client {
+        pub instance_id: String
+    }
 
     impl Ec2Client for MockEc2Client {
         async fn describe_instances(&self, _: Filter) -> Result<DescribeInstancesOutput, Box<dyn Error>> {
             Ok(DescribeInstancesOutput::builder()
                 .reservations(Reservation::builder()
                     .instances(Instance::builder()
+                        .instance_id(&self.instance_id)
                         .instance_type(InstanceType::T3aMedium)
                         .cpu_options(CpuOptions::builder()
                             .core_count(1)
@@ -92,7 +95,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_data() {
-        let client = MockEc2Client {};
+        let client = MockEc2Client {
+            instance_id: "ec2-instance".to_string()
+        };
         let config = Ec2Config {
             order_no: 1,
             instance_name: "ec2-instance".to_string()
