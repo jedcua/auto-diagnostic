@@ -20,6 +20,7 @@ use crate::lib::openai::OpenAiChatInput;
 use crate::lib::{args, openai, prompt};
 use clap::Parser;
 use std::error::Error;
+use async_openai::Client;
 use tokio::fs;
 
 const BANNER : &str = "
@@ -49,7 +50,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if !context.dry_run {
-        openai::send_request(&context, OpenAiChatInput {
+        let client = Client::new();
+        openai::send_request(client, &context, OpenAiChatInput {
             model: context.open_ai_model.clone(),
             max_tokens: context.open_ai_max_token,
             system_prompt: prompt::INSTRUCTION.to_string(),
