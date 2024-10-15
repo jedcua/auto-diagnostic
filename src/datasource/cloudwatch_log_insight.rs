@@ -1,5 +1,5 @@
 use crate::lib::config::CloudwatchLogInsightConfig;
-use crate::lib::context::{DateTimeRange};
+use crate::lib::context::DateTimeRange;
 use crate::lib::prompt::PromptData;
 use aws_sdk_cloudwatchlogs::operation::get_query_results::GetQueryResultsOutput;
 use aws_sdk_cloudwatchlogs::operation::start_query::StartQueryOutput;
@@ -114,6 +114,52 @@ mod tests {
     use super::*;
     use aws_sdk_cloudwatchlogs::types::ResultField;
 
+    struct MockCloudwatchLogsClient {}
+
+    impl CloudwatchLogsClient for MockCloudwatchLogsClient {
+        async fn start_query(&self, _: &str, _: &str, _: i64, _: i64) -> Result<StartQueryOutput, Box<dyn Error>> {
+            Ok(StartQueryOutput::builder()
+                .query_id("query_id".to_string())
+                .build())
+        }
+
+        async fn get_query_results(&self, _: String) -> Result<GetQueryResultsOutput, Box<dyn Error>> {
+            Ok(GetQueryResultsOutput::builder()
+                .status(Complete)
+                .results(vec![
+                    ResultField::builder()
+                        .field("column1")
+                        .value("row1-column1")
+                        .build(),
+                    ResultField::builder()
+                        .field("column2")
+                        .value("row1-column2")
+                        .build(),
+                ])
+                .results(vec![
+                    ResultField::builder()
+                        .field("column1")
+                        .value("row2-column1")
+                        .build(),
+                    ResultField::builder()
+                        .field("column2")
+                        .value("row2-column2")
+                        .build(),
+                ])
+                .results(vec![
+                    ResultField::builder()
+                        .field("column1")
+                        .value("row3-column1")
+                        .build(),
+                    ResultField::builder()
+                        .field("column2")
+                        .value("row3-column2")
+                        .build(),
+                ])
+                .build())
+        }
+    }
+
     #[test]
     fn test_build_description() {
         let config = CloudwatchLogInsightConfig {
@@ -143,47 +189,17 @@ mod tests {
         assert_eq!(result, Some("No applicable data found\n".to_string()));
     }
 
-    #[test]
-    fn test_extract_to_csv() {
-        let output = GetQueryResultsOutput::builder()
-            .results(vec![
-                ResultField::builder()
-                    .field("column1")
-                    .value("row1-column1")
-                    .build(),
-                ResultField::builder()
-                    .field("column2")
-                    .value("row1-column2")
-                    .build(),
-            ])
-            .results(vec![
-                ResultField::builder()
-                    .field("column1")
-                    .value("row2-column1")
-                    .build(),
-                ResultField::builder()
-                    .field("column2")
-                    .value("row2-column2")
-                    .build(),
-            ])
-            .results(vec![
-                ResultField::builder()
-                    .field("column1")
-                    .value("row3-column1")
-                    .build(),
-                ResultField::builder()
-                    .field("column2")
-                    .value("row3-column2")
-                    .build(),
-            ])
-            .build();
-
+    #[tokio::test]
+    async fn test_fetch_data() {
+        let client = MockCloudwatchLogsClient {};
         let config = CloudwatchLogInsightConfig {
             result_columns: vec!["column1".to_string(), "column2".to_string()],
             ..CloudwatchLogInsightConfig::default()
         };
+        let range = DateTimeRange::default();
 
-        let result = extract_to_csv(output, &config).expect("Should extract to csv");
+        let prompt_data = fetch_data(client, &config, &range).await.expect("Should extract to csv");
+
         let expected = [
             "column1,column2\n",
             "row1-column1,row1-column2\n",
@@ -191,50 +207,19 @@ mod tests {
             "row3-column1,row3-column2\n",
         ].join("");
 
-        assert_eq!(result, Some(expected));
+        assert_eq!(prompt_data.data, Some(expected));
     }
 
-    #[test]
-    #[should_panic(expected = "Expected column not matched! Expected: column1, Actual: column2")]
-    fn test_extract_to_csv_mismatch_column() {
-        let output = GetQueryResultsOutput::builder()
-            .results(vec![
-                ResultField::builder()
-                    .field("column1")
-                    .value("row1-column1")
-                    .build(),
-                ResultField::builder()
-                    .field("column2")
-                    .value("row1-column2")
-                    .build(),
-            ])
-            .results(vec![
-                ResultField::builder()
-                    .field("column2")
-                    .value("row2-column1")
-                    .build(),
-                ResultField::builder()
-                    .field("column1")
-                    .value("row2-column1")
-                    .build(),
-            ])
-            .results(vec![
-                ResultField::builder()
-                    .field("column1")
-                    .value("row3-column1")
-                    .build(),
-                ResultField::builder()
-                    .field("column2")
-                    .value("row3-column2")
-                    .build(),
-            ])
-            .build();
-
+    #[tokio::test]
+    #[should_panic(expected = "Expected column not matched! Expected: columnB, Actual: column2")]
+    async fn test_extract_to_csv_mismatch_column() {
+        let client = MockCloudwatchLogsClient {};
         let config = CloudwatchLogInsightConfig {
-            result_columns: vec!["column1".to_string(), "column2".to_string()],
+            result_columns: vec!["column1".to_string(), "columnB".to_string()],
             ..CloudwatchLogInsightConfig::default()
         };
+        let range = DateTimeRange::default();
 
-        extract_to_csv(output, &config).expect("Should extract to csv");
+        fetch_data(client, &config, &range).await.expect("Should extract to csv");
     }
 }
