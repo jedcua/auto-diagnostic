@@ -1,20 +1,28 @@
-```
-███╗     █████╗               ██████╗     ███╗
-██╔╝    ██╔══██╗              ██╔══██╗    ╚██║
-██║     ███████║    █████╗    ██║  ██║     ██║
-██║     ██╔══██║    ╚════╝    ██║  ██║     ██║
-███╗    ██║  ██║              ██████╔╝    ███║
-╚══╝    ╚═╝  ╚═╝              ╚═════╝     ╚══╝
-```
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/logo-light.png">
+    <img width="200" height="200" src="./docs/logo-dark.png">
+  </picture>
+</div>
+<hr/>
+
 [![Build](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml)
 [![Coverage](https://codecov.io/github/jedcua/auto-diagnostic/branch/main/graph/badge.svg?token=FG35DKAGJW)](https://codecov.io/github/jedcua/auto-diagnostic)
 
 ## Table of Contents
 
-- [Installation](#installation)
 - [Introduction](#introduction)
+- [Installation](#installation)
 - [Usage](#usage)
 - [Datasources](#datasources)
+
+## Introduction
+Auto diagnostic is a command line tool that diagnoses an AWS environment using AI.
+Under the hood, it does the following:
+1. Reading a `toml` configuration file
+2. Gathering relevant information from AWS services (EC2, RDS, Cloudwatch, etc.)
+3. Building a text prompt from gathered data
+4. Asking AI to perform diagnosis from text prompt
 
 ## Installation
 ### From Source
@@ -25,14 +33,6 @@ git clone https://github.com/jedcua/auto-diagnostic.git
 cd auto-diagnostic
 cargo install --path .
 ```
-
-## Introduction
-Auto diagnostic is a command line tool that diagnoses an AWS environment using AI.
-Under the hood, it does the following:
-1. Reading a `toml` configuration file
-2. Gathering relevant information from AWS services (EC2, RDS, Cloudwatch, etc.)
-3. Building a text prompt from gathered data
-4. Asking AI to perform diagnosis from text prompt
 
 ## Usage
 ```text
