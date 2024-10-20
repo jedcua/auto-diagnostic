@@ -97,3 +97,18 @@ impl PartialEq for DataSource {
 }
 
 impl Eq for DataSource {}
+
+#[cfg(test)]
+mod tests {
+    use crate::datasource::ds::DataSource::{AppDescription, CloudwatchLogInsight, CloudwatchMetric, Ec2, Rds};
+    use crate::lib::config::{AppDescConfig, CloudwatchLogInsightConfig, CloudwatchMetricConfig, Ec2Config, RdsConfig};
+
+    #[test]
+    fn test_fmt() {
+        assert_eq!(format!("{}", AppDescription { config: AppDescConfig::default() }), "App description");
+        assert_eq!(format!("{}", Ec2 { config: Ec2Config::default() }), "EC2 instance");
+        assert_eq!(format!("{}", Rds { config: RdsConfig::default() }), "RDS instance");
+        assert_eq!(format!("{}", CloudwatchMetric { config: CloudwatchMetricConfig::default() }), "Cloudwatch metric");
+        assert_eq!(format!("{}", CloudwatchLogInsight { config: CloudwatchLogInsightConfig::default() }), "Cloudwatch log insight");
+    }
+}

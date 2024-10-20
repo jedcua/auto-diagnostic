@@ -113,8 +113,19 @@ fn extract_to_csv(output: GetQueryResultsOutput, config: &CloudwatchLogInsightCo
 mod tests {
     use super::*;
     use aws_sdk_cloudwatchlogs::types::ResultField;
+    use std::cell::RefCell;
 
-    struct MockCloudwatchLogsClient {}
+    struct MockCloudwatchLogsClient {
+        status_queue: RefCell<Vec<QueryStatus>>
+    }
+
+    impl MockCloudwatchLogsClient {
+        fn new(statuses: Vec<QueryStatus>) -> Self {
+            MockCloudwatchLogsClient {
+                status_queue: RefCell::new(statuses)
+            }
+        }
+    }
 
     impl CloudwatchLogsClient for MockCloudwatchLogsClient {
         async fn start_query(&self, _: &str, _: &str, _: i64, _: i64) -> Result<StartQueryOutput, Box<dyn Error>> {
@@ -124,8 +135,11 @@ mod tests {
         }
 
         async fn get_query_results(&self, _: String) -> Result<GetQueryResultsOutput, Box<dyn Error>> {
+            let mut status_queue = self.status_queue.borrow_mut();
+            let query_status = status_queue.remove(0);
+
             Ok(GetQueryResultsOutput::builder()
-                .status(Complete)
+                .status(query_status.clone())
                 .results(vec![
                     ResultField::builder()
                         .field("column1")
@@ -191,7 +205,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_data() {
-        let client = MockCloudwatchLogsClient {};
+        let client = MockCloudwatchLogsClient::new(vec![Scheduled, Running, Complete]);
         let config = CloudwatchLogInsightConfig {
             result_columns: vec!["column1".to_string(), "column2".to_string()],
             ..CloudwatchLogInsightConfig::default()
@@ -213,11 +227,41 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "Expected column not matched! Expected: columnB, Actual: column2")]
     async fn test_extract_to_csv_mismatch_column() {
-        let client = MockCloudwatchLogsClient {};
+        let client = MockCloudwatchLogsClient::new(vec![Complete]);
         let config = CloudwatchLogInsightConfig {
             result_columns: vec!["column1".to_string(), "columnB".to_string()],
             ..CloudwatchLogInsightConfig::default()
         };
+        let range = DateTimeRange::default();
+
+        fetch_data(client, &config, &range).await.expect("Should extract to csv");
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Unexpected status: Failed")]
+    async fn test_fetch_data_failed() {
+        let client = MockCloudwatchLogsClient::new(vec![Failed]);
+        let config = CloudwatchLogInsightConfig::default();
+        let range = DateTimeRange::default();
+
+        fetch_data(client, &config, &range).await.expect("Should extract to csv");
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Unexpected status: Timeout")]
+    async fn test_fetch_data_timeout() {
+        let client = MockCloudwatchLogsClient::new(vec![Timeout]);
+        let config = CloudwatchLogInsightConfig::default();
+        let range = DateTimeRange::default();
+
+        fetch_data(client, &config, &range).await.expect("Should extract to csv");
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Unexpected status: Unknown")]
+    async fn test_fetch_data_unknown_value() {
+        let client = MockCloudwatchLogsClient::new(vec![UnknownValue]);
+        let config = CloudwatchLogInsightConfig::default();
         let range = DateTimeRange::default();
 
         fetch_data(client, &config, &range).await.expect("Should extract to csv");

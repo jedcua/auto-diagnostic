@@ -24,19 +24,19 @@ pub struct OpenAiConfig {
     pub max_token: u32
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct AppDescConfig {
     pub order_no: u8,
     pub description: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct Ec2Config {
     pub order_no: u8,
     pub instance_name: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct RdsConfig {
     pub order_no: u8,
     pub db_identifier: String
