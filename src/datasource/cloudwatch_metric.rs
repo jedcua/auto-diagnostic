@@ -8,7 +8,6 @@ use aws_sdk_cloudwatch::Client;
 use aws_smithy_types::DateTime;
 use csv::Writer;
 use std::error::Error;
-use aws_sdk_ec2::types::Instance;
 
 pub trait CloudwatchClient {
     async fn get_metric_data(&self, start_time: DateTime, end_time: DateTime, query: MetricDataQuery) -> Result<GetMetricDataOutput, Box<dyn Error>>;
@@ -26,12 +25,9 @@ impl CloudwatchClient for Client {
 }
 
 pub async fn fetch_data(client: impl CloudwatchClient, ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig, range: &DateTimeRange) -> Result<Vec<PromptData>, Box<dyn Error>> {
-    let instances = fetch_instances(ec2_client, &config.dimension_value).await?;
     let mut prompt_data_vec: Vec<PromptData> = Vec::new();
 
-    for instance in instances {
-        let dimension = build_dimension(instance, config);
-
+    for dimension in build_dimension(ec2_client, config).await? {
         let metric = Metric::builder()
             .metric_name(&config.metric_name)
             .namespace(&config.metric_namespace)
@@ -99,20 +95,25 @@ fn extract_to_csv(range: &DateTimeRange, output: GetMetricDataOutput) -> Result<
     Ok(Some(csv))
 }
 
-fn build_dimension(ec2_instance: Instance, config: &CloudwatchMetricConfig) -> Dimension {
-    let dimension_value;
-
+async fn build_dimension(ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig) -> Result<Vec<Dimension>, Box<dyn Error>> {
     // If EC2, fetch convert instance name to instance id first
     if config.metric_namespace == "AWS/EC2" {
-        dimension_value = ec2_instance.instance_id().unwrap().to_string();
-    } else {
-        dimension_value = config.dimension_value.clone();
+        let instances = fetch_instances(ec2_client, &config.dimension_value).await?;
+
+        return Ok(instances.into_iter()
+            .map(|instance| {
+                return Dimension::builder()
+                    .name(&config.dimension_name)
+                    .value(instance.instance_id().unwrap().to_string())
+                    .build()
+            })
+            .collect());
     }
 
-    Dimension::builder()
+    Ok(vec![Dimension::builder()
         .name(&config.dimension_name)
-        .value(dimension_value)
-        .build()
+        .value(&config.dimension_value)
+        .build()])
 }
 
 #[cfg(test)]
