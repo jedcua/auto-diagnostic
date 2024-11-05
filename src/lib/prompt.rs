@@ -32,21 +32,21 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
     progress_bar.enable_steady_tick(Duration::from_millis(100));
 
     for data_source in &context.data_sources {
-        let prompt_data = data_source.fetch_data(context).await?;
+        for prompt_data in data_source.fetch_data(context).await? {
+            progress_bar.set_message(format!("{data_source}"));
 
-        progress_bar.set_message(format!("{data_source}"));
-
-        prompt.push_str("<data>\n");
-        prompt.push_str(&prompt_data.description.join("\n"));
-        prompt.push('\n');
-        if let Some(data) = &prompt_data.data {
-            prompt.push_str("Data:\n");
-            prompt.push_str("```\n");
-            prompt.push_str(data);
-            prompt.push_str("```\n");
+            prompt.push_str("<data>\n");
+            prompt.push_str(&prompt_data.description.join("\n"));
+            prompt.push('\n');
+            if let Some(data) = &prompt_data.data {
+                prompt.push_str("Data:\n");
+                prompt.push_str("```\n");
+                prompt.push_str(data);
+                prompt.push_str("```\n");
+            }
+            prompt.push_str("</data>\n");
+            prompt.push('\n');
         }
-        prompt.push_str("</data>\n");
-        prompt.push('\n');
 
         progress_bar.inc(1);
     }

@@ -1,4 +1,4 @@
-use crate::datasource::ec2::{fetch_instance, Ec2Client};
+use crate::datasource::ec2::{fetch_instances, Ec2Client};
 use crate::lib::config::CloudwatchMetricConfig;
 use crate::lib::context::DateTimeRange;
 use crate::lib::prompt::PromptData;
@@ -8,6 +8,7 @@ use aws_sdk_cloudwatch::Client;
 use aws_smithy_types::DateTime;
 use csv::Writer;
 use std::error::Error;
+use aws_sdk_ec2::types::Instance;
 
 pub trait CloudwatchClient {
     async fn get_metric_data(&self, start_time: DateTime, end_time: DateTime, query: MetricDataQuery) -> Result<GetMetricDataOutput, Box<dyn Error>>;
@@ -24,40 +25,49 @@ impl CloudwatchClient for Client {
     }
 }
 
-pub async fn fetch_data(client: impl CloudwatchClient, ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig, range: &DateTimeRange) -> Result<PromptData, Box<dyn Error>> {
-    let metric = Metric::builder()
-        .metric_name(&config.metric_name)
-        .namespace(&config.metric_namespace)
-        .dimensions(build_dimension(ec2_client, config).await?)
-        .build();
+pub async fn fetch_data(client: impl CloudwatchClient, ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig, range: &DateTimeRange) -> Result<Vec<PromptData>, Box<dyn Error>> {
+    let instances = fetch_instances(ec2_client, &config.dimension_value).await?;
+    let mut prompt_data_vec: Vec<PromptData> = Vec::new();
 
-    let metric_stat = MetricStat::builder()
-        .metric(metric)
-        .stat(&config.metric_stat)
-        .period(60)
-        .build();
+    for instance in instances {
+        let dimension = build_dimension(instance, config);
 
-    let query = MetricDataQuery::builder()
-        .id(&config.metric_identifier)
-        .metric_stat(metric_stat)
-        .build();
+        let metric = Metric::builder()
+            .metric_name(&config.metric_name)
+            .namespace(&config.metric_namespace)
+            .dimensions(dimension.clone())
+            .build();
 
-    let start_time = DateTime::from_millis(range.start_time);
-    let end_time = DateTime::from_millis(range.end_time);
+        let metric_stat = MetricStat::builder()
+            .metric(metric)
+            .stat(&config.metric_stat)
+            .period(60)
+            .build();
 
-    let response = client.get_metric_data(start_time, end_time, query).await?;
+        let query = MetricDataQuery::builder()
+            .id(&config.metric_identifier)
+            .metric_stat(metric_stat)
+            .build();
 
-    Ok(PromptData {
-        description: build_description(config),
-        data: extract_to_csv(range, response)?
-    })
+        let start_time = DateTime::from_millis(range.start_time);
+        let end_time = DateTime::from_millis(range.end_time);
+
+        let response = client.get_metric_data(start_time, end_time, query).await?;
+
+        prompt_data_vec.push(PromptData {
+            description: build_description(config, dimension),
+            data: extract_to_csv(range, response)?
+        });
+    }
+
+    Ok(prompt_data_vec)
 }
 
-fn build_description(config: &CloudwatchMetricConfig) -> Vec<String> {
+fn build_description(config: &CloudwatchMetricConfig, dimension: Dimension) -> Vec<String> {
     vec![
         format!("Information: [Cloudwatch {}]", &config.metric_namespace),
         format!("Metric: [`{}`]", &config.metric_name),
-        format!("Dimension: [`{}:{}`]", &config.dimension_name, &config.dimension_value)
+        format!("Dimension: [`{}:{}`]", &dimension.name.unwrap(), &dimension.value.unwrap())
     ]
 }
 
@@ -89,21 +99,20 @@ fn extract_to_csv(range: &DateTimeRange, output: GetMetricDataOutput) -> Result<
     Ok(Some(csv))
 }
 
-async fn build_dimension(ec2_client: impl Ec2Client, config: &CloudwatchMetricConfig) -> Result<Dimension, Box<dyn Error>> {
+fn build_dimension(ec2_instance: Instance, config: &CloudwatchMetricConfig) -> Dimension {
     let dimension_value;
 
     // If EC2, fetch convert instance name to instance id first
     if config.metric_namespace == "AWS/EC2" {
-        let ec2_instance = fetch_instance(ec2_client, &config.dimension_value).await?;
         dimension_value = ec2_instance.instance_id().unwrap().to_string();
     } else {
         dimension_value = config.dimension_value.clone();
     }
 
-    Ok(Dimension::builder()
+    Dimension::builder()
         .name(&config.dimension_name)
         .value(dimension_value)
-        .build())
+        .build()
 }
 
 #[cfg(test)]
@@ -124,7 +133,12 @@ mod tests {
             ..CloudwatchMetricConfig::default()
         };
 
-        let description = build_description(&config);
+        let dimension = Dimension::builder()
+            .name("InstanceId")
+            .value("ec2-instance-name")
+            .build();
+
+        let description = build_description(&config, dimension);
 
         assert_eq!(description.len(), 3);
         assert_eq!(description[0], "Information: [Cloudwatch AWS/EC2]".to_string());
@@ -186,7 +200,7 @@ mod tests {
             time_zone: Tz::Asia__Manila,
         };
 
-        let prompt_data = fetch_data(client, ec2_client, &config, &range).await.expect("Should fetch data");
+        let prompt_data_vec = fetch_data(client, ec2_client, &config, &range).await.expect("Should fetch data");
 
         let expected = [
             "timestamp,value\n",
@@ -196,11 +210,12 @@ mod tests {
             "2023-10-12 17:30:00 PST,1\n"
         ].join("");
 
-        assert_eq!(prompt_data.description.len(), 3);
-        assert_eq!(prompt_data.description[0], "Information: [Cloudwatch AWS/EC2]".to_string());
-        assert_eq!(prompt_data.description[1], "Metric: [`CPUUtilization`]".to_string());
-        assert_eq!(prompt_data.description[2], "Dimension: [`InstanceId:ec2-instance-name`]".to_string());
-        assert_eq!(prompt_data.data, Some(expected));
+        assert_eq!(prompt_data_vec.len(), 1);
+        assert_eq!(prompt_data_vec.first().unwrap().description.len(), 3);
+        assert_eq!(prompt_data_vec.first().unwrap().description[0], "Information: [Cloudwatch AWS/EC2]".to_string());
+        assert_eq!(prompt_data_vec.first().unwrap().description[1], "Metric: [`CPUUtilization`]".to_string());
+        assert_eq!(prompt_data_vec.first().unwrap().description[2], "Dimension: [`InstanceId:ec2-instance-id`]".to_string());
+        assert_eq!(prompt_data_vec.first().unwrap().data, Some(expected));
     }
 
     fn date_time(s: &str) -> DateTime {
