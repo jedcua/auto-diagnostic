@@ -9,16 +9,18 @@ pub struct PromptData {
     pub data: Option<String>
 }
 
-pub const INSTRUCTION: &str = concat!(
-    "You are an AWS diagnostic assistant.\n",
-    "You will be given pieces of information surrounded by `<data></data>` tags\n",
-    "Use this information to perform a diagnosis.\n",
-    "Base your diagnosis from the provided information only.\n",
-    "Use all of the information provided in your diagnosis, but report only on information that needs immediate investigation/action.\n",
-    "Keep your diagnosis precise and straight to the point.\n",
-    "Format your response using Markdown.\n",
-    "Listed below are the information you will use:\n",
-);
+pub fn build_instruction() -> String {
+    let instructions = [
+        "You are an AWS diagnostic assistant.",
+        "Use the provided information surrounded with `<data></data>` tags",
+        "Focus only on areas that needs concern.",
+        "Include timestamps from important data, if relevant and necessary.",
+        "Format your response in Markdown format.",
+        "Organize your response into sections: Observation, diagnosis, and recommendation"
+    ];
+
+    instructions.join("\n")
+}
 
 pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn Error>> {
     let mut prompt = String::new();
@@ -59,8 +61,8 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::lib::config::AppDescConfig;
     use crate::datasource::ds::DataSource::AppDescription;
+    use crate::lib::config::AppDescConfig;
 
     #[tokio::test]
     async fn should_build_prompt_data_correctly() {

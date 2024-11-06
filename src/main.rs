@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         openai::send_request(client, &context, OpenAiChatInput {
             model: context.open_ai_model.clone(),
             max_tokens: context.open_ai_max_token,
-            system_prompt: prompt::INSTRUCTION.to_string(),
+            system_prompt: prompt::build_instruction(),
             user_prompt: prompt_data
         }).await?;
     }
