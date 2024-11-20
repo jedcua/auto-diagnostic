@@ -86,7 +86,8 @@ fn extract_to_csv(output: GetQueryResultsOutput, config: &CloudwatchLogInsightCo
     for result in output.results() {
         let mut values : Vec<String> = Vec::new();
 
-        for result_field in result {
+        // Discard '@ptr' from result
+        for result_field in result.iter().filter(|r| r.field().unwrap() != "@ptr") {
             let field = result_field.field().unwrap();
 
             if column == field {
@@ -142,6 +143,10 @@ mod tests {
                 .status(query_status.clone())
                 .results(vec![
                     ResultField::builder()
+                        .field("@ptr")
+                        .value("discarded")
+                        .build(),
+                    ResultField::builder()
                         .field("column1")
                         .value("row1-column1")
                         .build(),
@@ -152,6 +157,10 @@ mod tests {
                 ])
                 .results(vec![
                     ResultField::builder()
+                        .field("@ptr")
+                        .value("discarded")
+                        .build(),
+                    ResultField::builder()
                         .field("column1")
                         .value("row2-column1")
                         .build(),
@@ -161,6 +170,10 @@ mod tests {
                         .build(),
                 ])
                 .results(vec![
+                    ResultField::builder()
+                        .field("@ptr")
+                        .value("discarded")
+                        .build(),
                     ResultField::builder()
                         .field("column1")
                         .value("row3-column1")
