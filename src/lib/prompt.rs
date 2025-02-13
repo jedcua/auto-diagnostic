@@ -12,11 +12,11 @@ pub struct PromptData {
 pub fn build_instruction() -> String {
     let instructions = [
         "You are an AWS diagnostic assistant.",
-        "Use the provided information surrounded with `<data></data>` tags",
-        "Focus only on areas that needs concern.",
-        "Include timestamps from important data, if relevant and necessary.",
-        "Format your response in Markdown format.",
-        "Organize your response into sections: Observation, diagnosis, and recommendation"
+        "Perform a diagnosis using the provided information surrounded with `<data></data>` tags below.",
+        "Include timestamps from important data, if necessary.",
+        "Add visual elements such as graphs and tables drawn with ascii characters, if necessary",
+        "Format your response in Markdown.",
+        "Focus your report only on information that requires concern.",
     ];
 
     instructions.join("\n")
@@ -25,18 +25,11 @@ pub fn build_instruction() -> String {
 pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn Error>> {
     let mut prompt = String::new();
 
-    let progress_bar = ProgressBar::new(context.data_sources.len() as u64);
-    progress_bar.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{msg:.green}] [{pos:.yellow}/{len:.yellow}]")
-        .unwrap()
-        .tick_strings(&["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌘"])
-    );
-    progress_bar.enable_steady_tick(Duration::from_millis(100));
-
+    let progress_bar = initialize_progress_bar(context);
     for data_source in &context.data_sources {
-        for prompt_data in data_source.fetch_data(context).await? {
-            progress_bar.set_message(format!("{data_source}"));
+        progress_bar.set_message(format!("{data_source}"));
 
+        for prompt_data in data_source.fetch_data(context).await? {
             prompt.push_str("<data>\n");
             prompt.push_str(&prompt_data.description.join("\n"));
             prompt.push('\n');
@@ -56,6 +49,17 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
     progress_bar.finish_with_message("Fetched data sources");
 
     Ok(prompt)
+}
+
+fn initialize_progress_bar(context: &AppContext) -> ProgressBar {
+    let progress_bar = ProgressBar::new(context.data_sources.len() as u64);
+    progress_bar.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{msg:.green}] [{pos:.yellow}/{len:.yellow}]")
+        .unwrap()
+        .tick_strings(&["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘", "🌘"])
+    );
+    progress_bar.enable_steady_tick(Duration::from_millis(100));
+    progress_bar
 }
 
 #[cfg(test)]

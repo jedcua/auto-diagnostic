@@ -36,9 +36,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let banner = BANNER.replace("{x.y.z}", env!("CARGO_PKG_VERSION"));
     println!("{banner}");
 
+    let instructions = prompt::build_instruction();
     let prompt_data = prompt::build_prompt_data(&context).await?;
 
     if context.print_prompt_data {
+        println!("\n{instructions}\n");
         println!("\n{prompt_data}\n");
     }
 
@@ -47,7 +49,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         openai::send_request(client, &context, OpenAiChatInput {
             model: context.open_ai_model.clone(),
             max_tokens: context.open_ai_max_token,
-            system_prompt: prompt::build_instruction(),
+            system_prompt: instructions,
             user_prompt: prompt_data
         }).await?;
     }
