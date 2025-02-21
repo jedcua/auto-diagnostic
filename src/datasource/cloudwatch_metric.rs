@@ -60,11 +60,17 @@ pub async fn fetch_data(client: impl CloudwatchClient, ec2_client: impl Ec2Clien
 }
 
 fn build_description(config: &CloudwatchMetricConfig, dimension: Dimension) -> Vec<String> {
-    vec![
+    let mut description = vec![
         format!("Information: [Cloudwatch {}]", &config.metric_namespace),
         format!("Metric: [`{}`]", &config.metric_name),
         format!("Dimension: [`{}:{}`]", &dimension.name.unwrap(), &dimension.value.unwrap())
-    ]
+    ];
+
+    if let Some(unit) = &config.metric_unit {
+        description.push(format!("Unit: {}", unit));
+    }
+
+    description
 }
 
 fn extract_to_csv(range: &DateTimeRange, output: GetMetricDataOutput) -> Result<Option<String>, Box<dyn Error>> {

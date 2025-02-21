@@ -51,6 +51,7 @@ pub struct CloudwatchMetricConfig {
     pub metric_namespace: String,
     pub metric_name: String,
     pub metric_stat: String,
+    pub metric_unit: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Default)]

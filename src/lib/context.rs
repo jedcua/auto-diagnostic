@@ -150,6 +150,7 @@ mod test {
                         metric_namespace: "metric-namespace".to_string(),
                         metric_name: "metric-name".to_string(),
                         metric_stat: "metric-stat".to_string(),
+                        metric_unit: Some("metric-unit".to_string()),
                     }
                 ]),
                 cloudwatch_log_insight: Some(vec![

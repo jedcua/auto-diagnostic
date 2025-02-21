@@ -12,11 +12,11 @@ pub struct PromptData {
 pub fn build_instruction() -> String {
     let instructions = [
         "You are an AWS diagnostic assistant.",
-        "Perform a diagnosis using the provided information surrounded with `<data></data>` tags below.",
         "Include timestamps from important data, if necessary.",
         "Add visual elements such as graphs and tables drawn with ascii characters, if necessary",
         "Format your response in Markdown.",
-        "Focus your report only on information that requires concern.",
+        "Keep your report concise by including only critical areas.",
+        "Perform a diagnosis using the provided information below:",
     ];
 
     instructions.join("\n")
@@ -30,7 +30,6 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
         progress_bar.set_message(format!("{data_source}"));
 
         for prompt_data in data_source.fetch_data(context).await? {
-            prompt.push_str("<data>\n");
             prompt.push_str(&prompt_data.description.join("\n"));
             prompt.push('\n');
             if let Some(data) = &prompt_data.data {
@@ -39,7 +38,6 @@ pub async fn build_prompt_data(context: &AppContext) -> Result<String, Box<dyn E
                 prompt.push_str(data);
                 prompt.push_str("```\n");
             }
-            prompt.push_str("</data>\n");
             prompt.push('\n');
         }
 
@@ -83,7 +81,7 @@ mod test {
         };
 
         let prompt_data = build_prompt_data(&context).await.expect("Should build prompt data");
-        let expected_prompt_data = "<data>\nInformation: [App Description]\nThis is an app description\n</data>\n\n".to_string();
+        let expected_prompt_data = "Information: [App Description]\nThis is an app description\n\n".to_string();
 
         assert_eq!(prompt_data, expected_prompt_data);
     }
