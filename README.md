@@ -25,13 +25,15 @@ Under the hood, it does the following:
 4. Asking AI to perform diagnosis from text prompt
 
 ## Installation
-### From Source
-To install the CLI app from source, you need to have [Rust](https://www.rust-lang.org/) installed. Then run:
-
+First, you need to have [Rust](https://www.rust-lang.org/) installed
+### From crates.io
 ```sh
-git clone https://github.com/jedcua/auto-diagnostic.git
-cd auto-diagnostic
-cargo install --path .
+cargo install auto-diagnostic
+```
+
+### From Source
+```sh
+cargo install --git https://github.com/jedcua/auto-diagnostic.git
 ```
 
 ## Usage
