@@ -2,6 +2,12 @@
 name = "auto-diagnostic"
 version = "1.0.0"
 edition = "2021"
+license = "MIT"
+description = "AI powered diagnostic tool for AWS"
+repository = "https://github.com/jedcua/auto-diagnostic"
+readme = "README.md"
+keywords = ["aws", "openai", "diagnostic"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 async-openai = "0.27.2"
