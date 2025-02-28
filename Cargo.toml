@@ -8,6 +8,7 @@ repository = "https://github.com/jedcua/auto-diagnostic"
 readme = "README.md"
 keywords = ["aws", "openai", "diagnostic"]
 categories = ["command-line-utilities"]
+exclude = [".github", "target", "docs"]
 
 [dependencies]
 async-openai = "0.27.2"
