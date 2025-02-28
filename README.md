@@ -82,6 +82,7 @@ metric_identifier = 'rds_cpu_utilization'
 metric_namespace = 'AWS/RDS'
 metric_name = 'CPUUtilization'
 metric_stat = 'Average'
+metric_unit = 'percent'
 
 [[cloudwatch_metric]]
 order_no = 4
@@ -155,6 +156,8 @@ metric_namespace = 'AWS/RDS'
 metric_name = 'CPUUtilization'
 # Metric stat (e.g. Average, Minimum)
 metric_stat = 'Average'
+# Metric unit, optional
+metric_unit = 'percent'
 ```
 
 Cloudwatch log insight - Executes a query for log insight

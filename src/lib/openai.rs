@@ -97,6 +97,7 @@ mod tests {
                             function_call: None,
                             tool_calls: None,
                             role: None,
+                            refusal: None,
                         },
                         finish_reason: None,
                         logprobs: None,
@@ -104,6 +105,7 @@ mod tests {
                 ],
                 created: 0,
                 model: "gpt-40".to_string(),
+                service_tier: None,
                 system_fingerprint: None,
                 object: "chat.completion.chunk".to_string(),
                 usage: None
