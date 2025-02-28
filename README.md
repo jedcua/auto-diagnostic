@@ -7,7 +7,7 @@
 <hr/>
 
 [![Build](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/jedcua/auto-diagnostic/actions/workflows/rust.yml)
-![Crates.io Version](https://img.shields.io/crates/v/auto-diagnostic)
+![Crates.io Version](https://img.shields.io/crates/v/auto-diagnostic?link=https%3A%2F%2Fcrates.io%2Fcrates%2Fauto-diagnostic)
 [![Coverage](https://codecov.io/github/jedcua/auto-diagnostic/branch/main/graph/badge.svg?token=FG35DKAGJW)](https://codecov.io/github/jedcua/auto-diagnostic)
 
 ## Table of Contents
